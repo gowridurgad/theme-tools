@@ -19,6 +19,12 @@ import {
   lspHover,
 } from './extensions';
 import { hoverRendererFacet } from './extensions/hover';
+// TODO put that in index of extensions instead
+import {
+  OnDocumentLinkClick,
+  docLinksExtension,
+  onDocumentLinkClickFacet,
+} from './extensions/links';
 
 /**
  * The client capabilities are how we tell the language server what
@@ -89,6 +95,9 @@ export interface CodeMirrorDependencies {
    * you'd do it with that.
    */
   hoverOptions?: HoverOptions;
+
+  // TODO DOCS
+  onDocumentLinkClick?: OnDocumentLinkClick;
 }
 
 // There is one LanguageClient
@@ -102,6 +111,7 @@ export class CodeMirrorLanguageClient {
   private readonly linterExtension: Extension;
   private readonly hoverRenderer: HoverRenderer | undefined;
   private readonly hoverExtension: Extension;
+  private readonly onDocumentLinkClick: OnDocumentLinkClick | undefined;
 
   constructor(
     private readonly worker: Worker,
@@ -113,6 +123,7 @@ export class CodeMirrorLanguageClient {
       linterOptions,
       hoverRenderer,
       hoverOptions,
+      onDocumentLinkClick,
     }: CodeMirrorDependencies = {},
   ) {
     this.client = new LanguageClient(worker, {
@@ -128,6 +139,8 @@ export class CodeMirrorLanguageClient {
 
     this.hoverRenderer = hoverRenderer;
     this.hoverExtension = lspHover(hoverOptions);
+
+    this.onDocumentLinkClick = onDocumentLinkClick;
   }
 
   public async start() {
@@ -157,6 +170,7 @@ export class CodeMirrorLanguageClient {
       infoRendererFacet.of(this.infoRenderer),
       diagnosticRendererFacet.of(this.diagnosticRenderer),
       hoverRendererFacet.of(this.hoverRenderer),
+      docLinksExtension(this.onDocumentLinkClick),
     ]
       .concat(shouldLint ? this.linterExtension : [])
       .concat(shouldComplete ? this.autocompleteExtension : [])

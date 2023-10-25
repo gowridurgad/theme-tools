@@ -73,7 +73,7 @@ startServer(worker, {
     validateSectionSchema: async () => () => true,
   },
   loadConfig,
-  log(message) {
+  log(message: string) {
     console.info(message);
   },
 });

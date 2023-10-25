@@ -3,6 +3,7 @@
   "include": ["./src/**/*.ts"],
   "exclude": ["./dist"],
   "compilerOptions": {
+    "baseUrl": ".",
     "outDir": "dist",
     "rootDir": "src",
     "types": [],
@@ -11,6 +12,9 @@
       "webworker"
     ],
     "target": "ES2019",
+    "paths": {
+      "@shopify/theme-language-server-common": ["../theme-language-server-common/src"]
+    },
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
   "references": [

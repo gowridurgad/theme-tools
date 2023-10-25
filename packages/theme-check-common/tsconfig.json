@@ -10,11 +10,15 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    "baseUrl": ".",
+    "paths": {
+      "@shopify/liquid-html-parser": ["../liquid-html-parser/src"]
+    }
   },
   "references": [
     {
       "path": "../liquid-html-parser"
-    },
+    }
   ]
 }

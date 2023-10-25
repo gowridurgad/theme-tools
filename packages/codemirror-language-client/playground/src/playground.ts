@@ -50,6 +50,9 @@ async function main() {
           dom: node,
         };
       },
+      onDocumentLinkClick: (target) => {
+        debugger;
+      }
     },
   );
 
