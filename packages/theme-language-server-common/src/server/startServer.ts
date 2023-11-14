@@ -20,7 +20,7 @@ import { DocumentLinksProvider } from '../documentLinks';
 import { DocumentManager } from '../documents';
 import { OnTypeFormattingProvider } from '../formatting';
 import { HoverProvider } from '../hover';
-import { LinkedEditingRangesProvider } from '../linkedEditingRanges';
+import { LinkedEditingRangesProvider } from '../linkedEditingRanges/LinkedEditingRangesProvider';
 import { GetTranslationsForURI, useBufferOrInjectedTranslations } from '../translations';
 import { Dependencies } from '../types';
 import { debounce } from '../utils';
