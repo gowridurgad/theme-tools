@@ -1,14 +1,22 @@
-import { AugmentedSchemaValidators, AugmentedThemeDocset } from '@shopify/theme-check-common';
 import {
-  ConfigurationRequest,
+  AugmentedSchemaValidators,
+  AugmentedThemeDocset,
+  SourceCodeType,
+} from '@shopify/theme-check-common';
+import {
+  getLanguageService as getJsonLanguageService,
+  LanguageService,
+} from 'vscode-json-languageservice';
+import {
+  ClientCapabilities as LSPClientCapabilities,
   Connection,
-  DidCreateFilesNotification,
-  DidDeleteFilesNotification,
-  DidRenameFilesNotification,
   FileOperationRegistrationOptions,
   InitializeResult,
-  RegistrationRequest,
   TextDocumentSyncKind,
+  CompletionParams,
+  CompletionList,
+  Range,
+  TextEdit,
 } from 'vscode-languageserver';
 import { URI } from 'vscode-uri';
 import { ClientCapabilities } from '../ClientCapabilities';
@@ -26,8 +34,78 @@ import { Dependencies } from '../types';
 import { debounce } from '../utils';
 import { VERSION } from '../version';
 import { Configuration } from './Configuration';
+import { DocumentNode, NodeTypes } from '@shopify/liquid-html-parser';
+import { TextDocument } from 'vscode-languageserver-textdocument';
 
 const defaultLogger = () => {};
+
+class JSONLanguageService {
+  private service: LanguageService | undefined;
+
+  constructor(public documentManager: DocumentManager) {}
+
+  setup(clientCapabilities: LSPClientCapabilities) {
+    this.service = getJsonLanguageService({ clientCapabilities });
+    this.service.configure({
+      allowComments: false,
+      schemas: [
+        {
+          uri: 'https://raw.githubusercontent.com/Shopify/theme-liquid-docs/main/schemas/theme/section_schema.json',
+          fileMatch: ['section/*.liquid'],
+          schema: require('./section_schema').default,
+        },
+      ],
+    });
+  }
+
+  async doComplete(params: CompletionParams): Promise<CompletionList | null> {
+    const uri = params.textDocument.uri;
+    const doc = this.documentManager.get(uri);
+    if (!doc || doc.type !== SourceCodeType.LiquidHtml || doc.ast instanceof Error) {
+      return null;
+    }
+    const textDocument = doc.textDocument;
+    const rootNode = doc.ast as DocumentNode;
+    const schemaNode = rootNode.children.at(-1);
+    if (!schemaNode || schemaNode.type !== NodeTypes.LiquidRawTag || schemaNode.name !== 'schema') {
+      return null;
+    }
+
+    const markupNode = schemaNode.body;
+    const textOffset = textDocument.offsetAt(params.position);
+    const nodeOffset = markupNode.position.start;
+    const jsonOffset = textOffset - nodeOffset;
+    if (jsonOffset < 0) {
+      return null;
+    }
+
+    const jsonString = markupNode.value;
+    const jsonTextDocument = TextDocument.create(uri, 'json', 0, jsonString);
+    const jsonDocument = this.service!.parseJSONDocument(jsonTextDocument);
+    const jsonPosition = jsonTextDocument.positionAt(jsonOffset);
+    const items = await this.service!.doComplete(jsonTextDocument, jsonPosition, jsonDocument);
+
+    if (!items) return null;
+
+    return {
+      ...items,
+      items: items.items.map((item) => ({
+        ...item,
+        textEdit: {
+          range: Range.create(
+            textDocument.positionAt(
+              nodeOffset + jsonTextDocument.offsetAt((item.textEdit! as any).range!.start),
+            ),
+            textDocument.positionAt(
+              nodeOffset + jsonTextDocument.offsetAt((item.textEdit! as any).range!.end),
+            ),
+          ),
+          newText: item.textEdit?.newText,
+        } as TextEdit,
+      })),
+    };
+  }
+}
 
 /**
  * This code runs in node and the browser, it can't talk to the file system
@@ -125,6 +203,7 @@ export function startServer(
     return getThemeSettingsSchemaForRootURI(rootUri);
   };
 
+  const jsonLanguageService = new JSONLanguageService(documentManager);
   const completionsProvider = new CompletionsProvider({
     documentManager,
     themeDocset,
@@ -150,6 +229,7 @@ export function startServer(
 
   connection.onInitialize((params) => {
     clientCapabilities.setup(params.capabilities, params.initializationOptions);
+    jsonLanguageService.setup(params.capabilities);
     configuration.setup();
 
     const fileOperationRegistrationOptions: FileOperationRegistrationOptions = {
@@ -264,7 +344,9 @@ export function startServer(
   });
 
   connection.onCompletion(async (params) => {
-    return completionsProvider.completions(params);
+    const jsonitems = await jsonLanguageService.doComplete(params);
+    const normalItems = await completionsProvider.completions(params);
+    return jsonitems ?? normalItems;
   });
 
   connection.onHover(async (params) => {
