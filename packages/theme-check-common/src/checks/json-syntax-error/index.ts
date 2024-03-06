@@ -1,5 +1,6 @@
+import { JSONCError, printParseErrorCode } from '../../to-source-code';
 import { Severity, SourceCodeType, JSONCheckDefinition } from '../../types';
-import { getOffset, isError } from '../../utils';
+import { isError } from '../../utils';
 
 function cleanErrorMessage(error: Error) {
   const message = 'rawMessage' in error ? (error.rawMessage as string) : error.message;
@@ -28,20 +29,14 @@ export const JSONSyntaxError: JSONCheckDefinition = {
 
     return {
       async onCodePathStart(file) {
-        if (
-          'line' in error &&
-          typeof error.line === 'number' &&
-          'column' in error &&
-          typeof error.column === 'number'
-        ) {
-          const { line, column } = error;
-          const startIndex = getOffset(file.source, line, column);
-          const endIndex = getOffset(file.source, line, column) + 1;
-          context.report({
-            message: cleanErrorMessage(error),
-            startIndex,
-            endIndex: endIndex,
-          });
+        if (error instanceof JSONCError) {
+          for (const err of error.errors) {
+            context.report({
+              message: printParseErrorCode(err.error),
+              startIndex: err.offset,
+              endIndex: err.offset + err.length,
+            });
+          }
         } else {
           context.report({
             message: cleanErrorMessage(error),

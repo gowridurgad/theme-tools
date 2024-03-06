@@ -1,5 +1,6 @@
 import { toLiquidHtmlAST } from '@shopify/liquid-html-parser';
-import toJSON, {
+import { TextDocument } from 'vscode-languageserver-textdocument';
+import {
   ArrayNode,
   IdentifierNode,
   LiteralNode,
@@ -7,9 +8,10 @@ import toJSON, {
   PropertyNode,
   ValueNode,
 } from 'json-to-ast';
-import { parseTree, ParseError, Node as JSONCNode } from 'jsonc-parser';
+import { parseTree, ParseError, Node as JSONCNode, printParseErrorCode } from 'jsonc-parser';
 
 import { SourceCodeType, JSONSourceCode, LiquidSourceCode, JSONNode } from './types';
+export { printParseErrorCode };
 
 function asError(error: unknown): Error {
   if (error instanceof Error) {
@@ -63,126 +65,115 @@ interface JsonCArrayNode extends JSONCNode {
   children: JsonCValueNode[];
 }
 
+export class JSONCError extends Error {
+  constructor(public readonly errors: ParseError[]) {
+    const errorString = errors.map((error) => printParseErrorCode(error.error)).join('\n');
+    super(errorString);
+    this.name = 'JSONCError';
+    this.errors = errors;
+  }
+}
+
 function parseJSON(source: string): JSONNode | Error {
   try {
     const errors: ParseError[] = [];
     const tree = parseTree(source, errors, { allowTrailingComma: true });
     if (errors.length !== 0 || tree === undefined) {
       // Only surfacing the first error for now
-      return asError(errors[0]);
+      // create a massive error message by concat all the errors (join)
+      return asError(new JSONCError(errors));
     }
-    return transform(tree as BJSONCNode);
+    const doc = TextDocument.create('file:///', 'json', 0, source);
+    return transform(tree as BJSONCNode, doc);
   } catch (error) {
     return asError(error);
   }
 }
 
-// todo: calculate location properly (column, offset, etc)
-function transform(tree: BJSONCNode): JSONNode {
+function transform(tree: BJSONCNode, doc: TextDocument): JSONNode {
   switch (tree.type) {
     case 'object':
-      return objectNode(tree as JsonCObjectNode);
+      return objectNode(tree as JsonCObjectNode, doc);
     case 'property':
-      return propertyNode(tree as JsonCPropertyNode);
+      return propertyNode(tree as JsonCPropertyNode, doc);
     case 'array':
-      return arrayNode(tree as JsonCArrayNode);
+      return arrayNode(tree as JsonCArrayNode, doc);
     case 'string':
     case 'number':
     case 'boolean':
     case 'null':
-      return literalNode(tree as JsonCLiteralNode);
+      return literalNode(tree as JsonCLiteralNode, doc);
     default: {
       return {
         type: 'Literal',
         value: 'fallback value',
         raw: 'raw fallback value',
-      };
+        loc: loc(tree, doc),
+      } as LiteralNode;
     }
   }
 }
 
-function arrayNode(tree: JsonCArrayNode): ArrayNode {
+function loc(node: BJSONCNode, doc: TextDocument): JSONNode['loc'] {
+  const start = doc.positionAt(node.offset);
+  const end = doc.positionAt(node.offset + node.length);
+  return {
+    start: {
+      line: start.line,
+      column: start.character,
+      offset: node.offset,
+    },
+    end: {
+      line: end.line,
+      column: end.character,
+      offset: node.offset + node.length,
+    },
+    source: null,
+  };
+}
+
+function arrayNode(tree: JsonCArrayNode, doc: TextDocument): ArrayNode {
   return {
     type: 'Array',
-    children: tree.children.map(transform) as ValueNode[],
+    children: tree.children.map((child) => transform(child, doc)) as ValueNode[],
+    loc: loc(tree, doc),
   };
 }
 
-function objectNode(tree: JsonCObjectNode): ObjectNode {
+function objectNode(tree: JsonCObjectNode, doc: TextDocument): ObjectNode {
   return {
     type: 'Object',
-    children: tree.children.map(transform) as PropertyNode[],
+    children: tree.children.map((child) => transform(child, doc)) as PropertyNode[],
+    loc: loc(tree, doc),
   };
 }
 
-function literalNode(tree: JSONCNode): LiteralNode {
+function literalNode(tree: JsonCLiteralNode, doc: TextDocument): LiteralNode {
   return {
     type: 'Literal',
     value: tree.value,
     raw: `"${tree.value.toString()}"`,
+    loc: loc(tree, doc),
   };
 }
 
-function propertyNode(node: JsonCPropertyNode): PropertyNode {
+function propertyNode(node: JsonCPropertyNode, doc: TextDocument): PropertyNode {
   return {
     type: 'Property',
-    key: identifierNode(node.children![0] as JSONCNode),
-    value: transform(node.children![1] as JsonCLiteralNode) as ValueNode,
+    key: identifierNode(node.children![0] as JsonCLiteralNode, doc),
+    value: transform(node.children![1] as JsonCLiteralNode, doc) as ValueNode,
+    loc: loc(node, doc),
   };
 }
 
-function identifierNode(node: JSONCNode): IdentifierNode {
+function identifierNode(node: JsonCLiteralNode, doc: TextDocument): IdentifierNode {
   return {
     type: 'Identifier',
     value: node.value,
     raw: `"${node.value}"`,
+    loc: loc(node, doc),
   };
 }
-
-// FOR REFERENCE
-
-// function toJsonToAstASt(jsonDoc: JSONDocument): JSONNode {
-//   const ast = jsonDoc.root;
-//   return astNodeToJsonToAstAst(ast);
-// }
-
-// function astNodeToJsonToAstAst(astNode: ASTNode): JSONNode {
-//   switch (astNode.type) {
-//     case 'object':
-//       return objectToObjectNode(astNode);
-//     case 'array':
-//       return {
-//         type: 'array',
-//         children: astNode.items.map(astNodeToJsonToAstAst),
-//       };
-//     case 'string':
-//       return {
-//         type: 'string',
-//         value: astNode.value,
-//       };
-//     case 'number':
-//       return {
-//         type: 'number',
-//         value: astNode.value,
-//       };
-//     case 'boolean':
-//       return {
-//         type: 'boolean',
-//         value: astNode.value,
-//       };
-//     case 'null':
-//       return {
-//         type: 'null',
-//       };
-//   }
-// }
-
-// function objectToObjectNode(astNode: ObjectASTNode): ObjectNode {
-//   return {
-//     type: 'object',
-//     children: astNode.properties.map((property) => propertyToPropertyNode(property)),
-//   };
-// }
 
 export function toSourceCode(
   absolutePath: string,
