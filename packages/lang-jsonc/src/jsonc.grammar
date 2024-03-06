@@ -38,7 +38,7 @@ PropertyName { string }
 }
 
 @skip { whitespace | LineComment | BlockComment }
-list<item> { item ("," item)* }
+list<item> { item ("," item)* ","? }
 
 @external propSource jsonHighlighting from "./highlight"
 
