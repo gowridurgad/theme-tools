@@ -19,8 +19,340 @@ const tags = WEBPACK_TAGS;
 const filters = WEBPACK_FILTERS;
 const objects = WEBPACK_OBJECTS;
 const systemTranslations = WEBPACK_SYSTEM_TRANSLATIONS;
-const sectionSchema = WEBPACK_SECTION_SCHEMA;
+// const sectionSchema = WEBPACK_SECTION_SCHEMA;
 const translationsSchema = WEBPACK_TRANSLATIONS_SCHEMA;
+
+const baseURI = `https://schemas.shopify.dev/`;
+
+const inputSettingsSchema = JSON.stringify({
+  $schema: 'http://json-schema.org/draft-07/schema#',
+  $id: `${baseURI}/schemas/input_settings`,
+  type: 'array',
+  description: 'Section specific settings.',
+  items: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description:
+          'The unique identifier for the setting, which is used to access the setting value.',
+      },
+      type: {
+        type: 'string',
+        description: 'The input type of the setting.',
+        enum: [
+          'article',
+          'blog',
+          'checkbox',
+          'collection_list',
+          'collection',
+          'color_background',
+          'color_scheme_group',
+          'color_scheme',
+          'color',
+          'font_picker',
+          'header',
+          'html',
+          'image_picker',
+          'inline_richtext',
+          'link_list',
+          'liquid',
+          'number',
+          'page',
+          'paragraph',
+          'product_list',
+          'product',
+          'radio',
+          'range',
+          'richtext',
+          'select',
+          'text',
+          'textarea',
+          'text_alignment',
+          'url',
+          'video_url',
+          'video',
+        ],
+      },
+      label: {
+        type: 'string',
+        description: 'The label for the setting, which will show in the theme editor.',
+      },
+      default: {
+        type: ['string', 'number', 'boolean'],
+        description: 'The default value for the setting.',
+      },
+      info: {
+        type: 'string',
+        description: 'An option for informational text about the setting.',
+      },
+    },
+    if: {
+      anyOf: [
+        {
+          properties: {
+            type: {
+              const: 'header',
+            },
+          },
+        },
+        {
+          properties: {
+            type: {
+              const: 'paragraph',
+            },
+          },
+        },
+      ],
+    },
+    then: {
+      required: ['type'],
+    },
+    else: {
+      required: ['id', 'type', 'label'],
+    },
+  },
+  minItems: 0,
+});
+
+const sectionSchema = JSON.stringify({
+  $schema: 'http://json-schema.org/draft-07/schema#',
+  $id: `${baseURI}/schemas/section`,
+  title: 'Shopify Liquid Theme Section Schema',
+  type: 'object',
+  additionalProperties: false,
+  definitions: {
+    sectionToggle: {
+      type: 'object',
+      description: 'Restrict the section to certain template page types and section group types.',
+      properties: {
+        templates: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: [
+              '*',
+              '404',
+              'article',
+              'blog',
+              'captcha',
+              'cart',
+              'collection',
+              'customers/account',
+              'customers/activate_account',
+              'customers/addresses',
+              'customers/login',
+              'customers/order',
+              'customers/register',
+              'customers/reset_password',
+              'gift_card',
+              'index',
+              'list-collections',
+              'metaobject',
+              'page',
+              'password',
+              'policy',
+              'product',
+              'search',
+            ],
+          },
+          uniqueItems: true,
+        },
+        groups: {
+          type: 'array',
+          items: {
+            type: 'string',
+          },
+          uniqueItems: true,
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  properties: {
+    name: {
+      type: 'string',
+      description: 'The section title shown in the theme editor.',
+    },
+    tag: {
+      type: 'string',
+      description: 'The HTML element to use for the section.',
+      enum: ['article', 'aside', 'div', 'footer', 'header', 'section'],
+    },
+    class: {
+      type: 'string',
+      description: 'Additional CSS class for the section.',
+    },
+    limit: {
+      type: 'integer',
+      description: 'The number of times a section can be added to a template or section group.',
+      minimum: 1,
+      maximum: 2,
+    },
+    settings: {
+      description: 'Section specific settings.',
+      $ref: `${baseURI}/schemas/input_settings`,
+    },
+    max_blocks: {
+      type: 'integer',
+      description: 'The maximum number of blocks allowed in the section.',
+      minimum: 1,
+      maximum: 50,
+    },
+    blocks: {
+      type: 'array',
+      description: 'Section blocks.',
+      items: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'The block name.',
+          },
+          type: {
+            type: 'string',
+            description: 'The block type.',
+          },
+          settings: {
+            description: 'Block settings.',
+            $ref: `${baseURI}/schemas/input_settings`,
+          },
+        },
+        if: {
+          properties: {
+            type: {
+              const: '@app',
+            },
+          },
+        },
+        then: {
+          required: ['type'],
+        },
+        else: {
+          required: ['name', 'type'],
+        },
+      },
+    },
+    presets: {
+      type: 'array',
+      description: 'Section presets.',
+      items: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'The preset name.',
+          },
+          settings: {
+            type: 'object',
+            description: 'Default values for settings.',
+            additionalProperties: {
+              anyOf: [
+                { type: 'number' },
+                { type: 'boolean' },
+                { type: 'string' },
+                { type: 'array', items: { type: 'string' } },
+              ],
+            },
+          },
+          blocks: {
+            type: 'array',
+            description: 'Default blocks.',
+            items: {
+              type: 'object',
+              properties: {
+                type: {
+                  type: 'string',
+                  description: 'The block type.',
+                },
+                settings: {
+                  type: 'object',
+                  description: 'Block settings.',
+                  additionalProperties: {
+                    anyOf: [
+                      { type: 'number' },
+                      { type: 'boolean' },
+                      { type: 'string' },
+                      {
+                        type: 'array',
+                        items: { type: 'string' },
+                      },
+                    ],
+                  },
+                },
+              },
+              required: ['type'],
+            },
+          },
+        },
+        required: ['name'],
+      },
+    },
+    default: {
+      type: 'object',
+      description: 'Default configuration for statically rendered sections.',
+      properties: {
+        settings: {
+          type: 'object',
+          description: 'Default values for settings.',
+          additionalProperties: {
+            anyOf: [
+              { type: 'number' },
+              { type: 'boolean' },
+              { type: 'string' },
+              { type: 'array', items: { type: 'string' } },
+            ],
+          },
+        },
+        blocks: {
+          type: 'array',
+          description: 'Default blocks.',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                description: 'The block type.',
+              },
+              settings: {
+                type: 'object',
+                description: 'Block settings.',
+                additionalProperties: {
+                  anyOf: [
+                    { type: 'number' },
+                    { type: 'boolean' },
+                    { type: 'string' },
+                    { type: 'array', items: { type: 'string' } },
+                  ],
+                },
+              },
+            },
+            required: ['type'],
+          },
+        },
+      },
+    },
+    locales: {
+      type: 'object',
+      description: 'A set of translated strings for the section.',
+      additionalProperties: {
+        type: 'object',
+        additionalProperties: {
+          type: 'string',
+        },
+      },
+    },
+    enabled_on: {
+      description: 'Restrict the section to certain template page types and section group types.',
+      $ref: '#/definitions/sectionToggle',
+    },
+    disabled_on: {
+      description:
+        'Prevent the section from being used on certain template page types and section group types.',
+      $ref: '#/definitions/sectionToggle',
+    },
+  },
+});
 
 const worker = self as any as Worker;
 
@@ -88,13 +420,17 @@ startServer(worker, {
   },
   jsonValidationSet: {
     schemas: {
-      'https://shopify.dev/section-schema.json': {
-        uri: 'https://shopify.dev/section-schema.json',
+      [`${baseURI}/schemas/section`]: {
+        uri: `${baseURI}/schemas/section`,
         fileMatch: ['**/sections/*.liquid'],
         schema: Promise.resolve(sectionSchema),
       },
-      'https://shopify.dev/translations-schema.json': {
-        uri: 'https://shopify.dev/translations-schema.json',
+      [`${baseURI}/schemas/input_settings`]: {
+        uri: `${baseURI}/schemas/input_settings`,
+        schema: Promise.resolve(inputSettingsSchema),
+      },
+      [`${baseURI}/schemas/translations`]: {
+        uri: `${baseURI}/schemas/translations`,
         fileMatch: ['**/locales/*.json'],
         schema: Promise.resolve(translationsSchema),
       },
