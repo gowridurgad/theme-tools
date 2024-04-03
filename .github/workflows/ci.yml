@@ -62,9 +62,9 @@ jobs:
         uses: actions/cache@v3
         with:
             path: ${{ steps.npm-cache.outputs.dir }}
-            key: ${{ runner.os }}-node-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('**/package-lock.json') }}
+            key: ${{ runner.os }}-node-${{ steps.setup-node.outputs.node-version }}-${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
             restore-keys: | 
-              ${{ runner.os }}-node-${{ steps.setup-node.outputs.node-version }}
+              ${{ runner.os }}-node-${{ steps.setup-node.outputs.node-version }}-${{ matrix.node-version }}
 
       - name: Install the packages
         run: yarn install --frozen-lockfile --ignore-engines
