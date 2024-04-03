@@ -54,18 +54,6 @@ jobs:
           cache: "yarn"
           cache-dependency-path: "yarn.lock"
 
-      - name: Get npm cache directory
-        id: npm-cache
-        run: echo "::set-output name=dir::$(npm config get cache)"
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v3
-        with:
-            path: ${{ steps.npm-cache.outputs.dir }}
-            key: ${{ runner.os }}-node-${{ steps.setup-node.outputs.node-version }}-${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
-            restore-keys: | 
-              ${{ runner.os }}-node-${{ steps.setup-node.outputs.node-version }}-${{ matrix.node-version }}
-
       - name: Install the packages
         run: yarn install --frozen-lockfile --ignore-engines
 
