@@ -75,6 +75,7 @@ jobs:
 
 
       - name: Install the packages
+        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile --ignore-engines
 
       - name: Build the code
