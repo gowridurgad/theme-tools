@@ -54,7 +54,6 @@ jobs:
       - name: Cache node_modules
         uses: actions/cache@v4
         with:
-          node-version: ${{ matrix.node-version }}
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -63,11 +62,15 @@ jobs:
       - name: Cache yarn cache
         uses: actions/cache@v4
         with:
-         node-version: ${{ matrix.node-version }}
          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
          key: ${{ runner.os }}-yarn-cache-${{ hashFiles('**/yarn.lock') }}
          restore-keys: |
            ${{ runner.os }}-yarn-cache-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
 
 
       - name: Install the packages
