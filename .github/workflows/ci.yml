@@ -1,6 +1,8 @@
+# https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions
 name: CI
 
-on: [push]
+on: 
+ workflow_dispatch:
 
 jobs:
   code-quality:
@@ -51,13 +53,6 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: "yarn"
           cache-dependency-path: "yarn.lock"
-
-      - name: Cache Dependencies
-        uses: actions/cache@v2
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-${{ github.run_id }}-node-modules
-          restore-keys: ${{ runner.os }}-node-modules
 
       - name: Install the packages
         run: yarn install --frozen-lockfile --ignore-engines
