@@ -1,8 +1,6 @@
-# https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions
 name: CI
 
-on: 
-   workflow_dispatch:
+on: [push]
 
 jobs:
   code-quality:
@@ -37,8 +35,8 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        os: [windows-latest]
-        node-version: [20]
+        os: [windows-latest, ubuntu-latest]
+        node-version: [18, 20]
 
     name: Tests / OS ${{ matrix.os }} / NodeJS ${{ matrix.node-version }}
 
@@ -47,35 +45,21 @@ jobs:
         with:
           submodules: true
 
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: "yarn"
+          cache-dependency-path: "yarn.lock"
 
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-
-      - name: Cache node_modules
-        uses: actions/cache@v4
+      - name: Cache Dependencies
+        uses: actions/cache@v2
         with:
           path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
-
-      - name: Cache yarn cache
-        uses: actions/cache@v4
-        with:
-         path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-         key: ${{ runner.os }}-yarn-cache-${{ hashFiles('**/yarn.lock') }}
-         restore-keys: |
-           ${{ runner.os }}-yarn-cache-${{ hashFiles('**/yarn.lock') }}
-
+          key: ${{ runner.os }}-${{ github.run_id }}-node-modules
+          restore-keys: ${{ runner.os }}-node-modules
 
       - name: Install the packages
-        if: steps.setup-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile --ignore-engines
 
       - name: Build the code
@@ -95,4 +79,3 @@ jobs:
 
       - name: Run the prettier3 idempotence tests
         run: yarn --cwd packages/prettier-plugin-liquid test:idempotence:3
-# testing the repo
